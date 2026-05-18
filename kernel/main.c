@@ -178,6 +178,7 @@ initrd_init(mod_start, mod_end);
     initrd_list();
    // kprintf("user_sp offset = %zu\n", offsetof(process_t, user_sp));
     // アイドルプロセス (PID=1)
+    /*
     process_t *idle = proc_create("idle", proc_idle, false);
     if (!idle) panic("failed to create idle process");
 
@@ -187,7 +188,7 @@ initrd_init(mod_start, mod_end);
 
     process_t *sender = proc_create("sender", proc_sender, false);
     if (!sender) panic("failed to create sender process");
-/*
+*/
 elf_load_result_t elf;
 if (elf_load_from_initrd("bin/sh", &elf)) {
     process_t *shell = proc_create_elf("sh", elf.entry);
@@ -196,13 +197,13 @@ if (elf_load_from_initrd("bin/sh", &elf)) {
 } else {
     kprintf("[KERN] failed to load shell\n");
 }
-*/
+
     // ── スケジューラ起動 ────────────────────────────────
     kprintf("[KERN] starting scheduler...\n");
 
     // 割り込み有効化 (ここからタイマー割り込みが来る)
-    current_proc = idle;
-    idle->state  = PROC_RUNNING;
+    //current_proc = idle;
+    //idle->state  = PROC_RUNNING;
     sti();
 
     // アイドルループ: スケジューラが他のプロセスを動かす
