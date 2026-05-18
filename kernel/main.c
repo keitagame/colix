@@ -1,3 +1,4 @@
+#include "stddef.h" 
 #include "kernel.h"
 #include "initrd.h"
 #include "multiboot2.h"
@@ -175,7 +176,7 @@ uint8_t *mod_start = NULL;
     }
 initrd_init(mod_start, mod_end);
     initrd_list();
-    
+   // kprintf("user_sp offset = %zu\n", offsetof(process_t, user_sp));
     // アイドルプロセス (PID=1)
     process_t *idle = proc_create("idle", proc_idle, false);
     if (!idle) panic("failed to create idle process");

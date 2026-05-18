@@ -185,7 +185,7 @@ typedef struct process {
 
     uint64_t       sleep_ticks;
     pid_t          wait_pid;         // waitpid 待機中の子 PID
-uint64_t user_sp;
+
     // IPC
     struct ipc_message *msg_queue;
     struct ipc_message *msg_tail;
@@ -198,6 +198,7 @@ uint64_t user_sp;
     uint64_t       brk;
 struct trapframe64 *tf;
     char name[16];
+    uint64_t user_sp;
 } process_t;
 
 extern process_t  proc_table[PROC_MAX];

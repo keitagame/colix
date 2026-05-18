@@ -7,7 +7,7 @@ global proc_entrypoint
 
 extern proc_exit
 extern current_proc
-%define PROC_USER_SP_OFFSET  0x30   ; 例：自分の struct layout から計算
+%define PROC_USER_SP_OFFSET  0x48   ; 例：自分の struct layout から計算
 
 proc_entrypoint:
     mov     rax, [rel current_proc]   ; rax = current_proc
