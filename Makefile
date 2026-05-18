@@ -29,6 +29,8 @@ LDFLAGS = -T linker.ld \
 # ソースファイル
 C_SRCS = kernel/main.c \
 		  kernel/initrd.c \
+		  kernel/elf_loader.c \
+		  kernel/lib/mem.c \
           kernel/lib/serial.c \
           kernel/arch/x86_64/vga.c \
           kernel/arch/x86_64/gdt.c \

@@ -1,6 +1,9 @@
 #include "kernel.h"
 #include "initrd.h"
 #include "multiboot2.h"
+#include "elf.h"
+#include "elf_loader.h"
+
 // Multiboot2 マジック
 #define MULTIBOOT2_BOOTLOADER_MAGIC 0x36D76289
 
@@ -172,6 +175,7 @@ uint8_t *mod_start = NULL;
     }
 initrd_init(mod_start, mod_end);
     initrd_list();
+    
     // アイドルプロセス (PID=1)
     process_t *idle = proc_create("idle", proc_idle, false);
     if (!idle) panic("failed to create idle process");
@@ -182,6 +186,14 @@ initrd_init(mod_start, mod_end);
 
     process_t *sender = proc_create("sender", proc_sender, false);
     if (!sender) panic("failed to create sender process");
+
+elf_load_result_t elf;
+if (elf_load_from_initrd("bin/shell", &elf)) {
+    process_t *shell = proc_create_elf("shell", elf.entry);
+    if (!shell) panic("failed to create shell process");
+} else {
+    kprintf("[KERN] failed to load shell\n");
+}
 
     // ── スケジューラ起動 ────────────────────────────────
     kprintf("[KERN] starting scheduler...\n");

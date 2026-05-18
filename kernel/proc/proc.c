@@ -6,6 +6,45 @@ uint64_t   ticks = 0;
 
 // 次のPIDカウンタ
 static pid_t next_pid = 1;
+/*
+process_t *proc_create_elf(const char *name, uint64_t entry) {
+    process_t *p = proc_create(name, NULL, false); // ベースだけ作る
+    if (!p) return NULL;
+
+    // スタック確保（1ページ）
+    uint64_t stack = pmm_alloc_page();
+    if (!stack) return NULL;
+
+    p->rsp = stack + 0x1000; // 上端
+    p->rip = entry;
+    p->rbp = 0;
+
+    p->state = PROC_READY;
+    return p;
+}
+*/
+process_t *proc_create_elf(const char *name, uint64_t entry) {
+    process_t *p = proc_create(name, NULL, false);
+    if (!p) return NULL;
+
+    // カーネルスタック確保
+    p->kstack = pmm_alloc_page();
+    uint64_t stack_top = (uint64_t)p->kstack + 0x1000;
+
+    // trapframe をスタック上に作る
+    p->tf = (struct trapframe64 *)(stack_top - sizeof(struct trapframe64));
+
+    memset(p->tf, 0, sizeof(struct trapframe64));
+
+    p->tf->rip = entry;
+    p->tf->rsp = stack_top - 0x20; // 少し余裕
+    p->tf->cs  = 0x08;             // カーネルコード
+    p->tf->ss  = 0x10;             // カーネルデータ
+    p->tf->rflags = 0x202;         // IF=1
+
+    p->state = PROC_READY;
+    return p;
+}
 
 void proc_init(void) {
     for (int i = 0; i < PROC_MAX; i++) {

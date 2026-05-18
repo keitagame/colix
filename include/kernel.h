@@ -146,6 +146,11 @@ typedef struct {
 #define KSTACK_SIZE   (PAGE_SIZE * 4)   // 16KB カーネルスタック
 #define USER_STACK_TOP  0x7FFFFF000ULL  // ユーザースタック先頭
 #define USER_STACK_SIZE (PAGE_SIZE * 8) // 32KB ユーザースタック
+struct trapframe64 {
+    uint64_t r15, r14, r13, r12, r11, r10, r9, r8;
+    uint64_t rsi, rdi, rbp, rdx, rcx, rbx, rax;
+    uint64_t rip, cs, rflags, rsp, ss;
+};
 
 typedef enum {
     PROC_UNUSED = 0,
@@ -186,10 +191,10 @@ typedef struct process {
 
     // ファイル記述子
     fd_entry_t     fds[MAX_FDS];
-
+ uint8_t *kstack;
     // ヒープ (sbrk 用)
     uint64_t       brk;
-
+struct trapframe64 *tf;
     char name[16];
 } process_t;
 
