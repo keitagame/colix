@@ -5,6 +5,21 @@
 process_t  proc_table[PROC_MAX];
 process_t *current_proc = NULL;
 uint64_t   ticks = 0;
+// proc.c の先頭（proc_table の前）に置く
+process_t *alloc_proc_slot(void);
+int alloc_pid(void);
+uint64_t alloc_kernel_stack_for_proc(process_t *p);
+//void vmm_map_user_stack(process_t *p, uint64_t base, uint64_t size);
+void enter_user_mode(uint64_t rip, uint64_t rsp, uint64_t cr3);
+extern uint64_t kernel_pml4;  // もしくは current_cr3()
+
+void vmm_map_user_stack(process_t *p, uint64_t base, uint64_t size) {
+    for (uint64_t off = 0; off < size; off += 0x1000) {
+        uint64_t phys = pmm_alloc_page();
+        vmm_map_page(kernel_pml4, base + off, phys,
+                     PAGE_WRITE);
+    }
+}
 
 // 次のPIDカウンタ
 static pid_t next_pid = 1;
@@ -24,7 +39,7 @@ process_t *proc_create_elf(const char *name, uint64_t entry) {
     p->state = PROC_READY;
     return p;
 }
-*/
+
 process_t *proc_create_elf(const char *name, uint64_t entry) {
     process_t *p = proc_create(name, NULL, false);
     if (!p) return NULL;
@@ -58,6 +73,56 @@ vmm_map(kernel_pml4, va, pa, 0x3);
 
     p->state = PROC_READY;
     return p;
+}
+*/
+process_t *proc_create_elf(const char *name, elf_load_result_t *elf) {
+    process_t *p = alloc_proc_slot();   // proc_table から空きを取る前提
+
+    p->pid     = alloc_pid();
+    p->state   = PROC_READY;
+    p->is_user = true;
+    p->started = false;
+
+    // ユーザスタック確保（例: 上位アドレスに 1 ページ）
+    uint64_t user_stack_top = 0x00007fffffffe000ULL;
+    vmm_map_user_stack(p, user_stack_top - 0x1000, 0x1000);
+
+    p->user_rip = elf->entry;
+    p->user_rsp = user_stack_top;
+
+    // ページテーブル（必要なら）
+    //p->cr3 = elf->cr3;  // or vmm_clone_kernel_space()
+
+    // カーネルスタックも確保（syscall/IRQ 用）
+    p->kernel_rsp = alloc_kernel_stack_for_proc(p);
+extern void proc_entry_user(void);
+
+p->context.rsp = p->kernel_rsp;
+p->context.rip = (uint64_t)proc_entry_user;
+
+    return p;
+}
+process_t *alloc_proc_slot(void) {
+    for (int i = 0; i < PROC_MAX; i++) {
+        if (proc_table[i].state == PROC_UNUSED) {
+            memset(&proc_table[i], 0, sizeof(process_t));
+            proc_table[i].state = PROC_READY;
+            return &proc_table[i];
+        }
+    }
+    return NULL;
+}
+//static int next_pid = 1;
+
+int alloc_pid(void) {
+    return next_pid++;
+}
+uint64_t alloc_kernel_stack_for_proc(process_t *p) {
+    uint64_t stack = pmm_alloc_page();   // 4KB
+    if (!stack) panic("no memory for kernel stack");
+
+    // スタックは上から使う
+    return stack + 0x1000;
 }
 
 void proc_init(void) {
@@ -134,11 +199,12 @@ process_t *proc_create(const char *name, void (*entry)(void), bool user) {
 
     // proc_entrypoint を初回起動先にする
     extern void proc_entrypoint(void);
+    extern void user_trampoline(void);   // C
     p->context.rip = (uint64_t)proc_entrypoint;
 
     // TSSのRSP0 (カーネルスタックトップ = 割り込み時に使用)
     p->kernel_rsp = kstack_top;
-
+memset(&p->context, 0, sizeof(p->context));
     p->pid   = next_pid++;
     p->ppid  = current_proc ? current_proc->pid : 0;
     p->state = PROC_READY;
@@ -224,6 +290,11 @@ void schedule(void) {
             current_proc = p;
             p->state = PROC_RUNNING;
             gdt_set_tss_rsp0(p->kernel_rsp);
+            if (p->is_user && !p->started) {
+                p->started = true;
+                enter_user_mode(p->user_rip, p->user_rsp, p->cr3);
+                // ここには戻ってこない（iretq でユーザに飛ぶ）
+            }
             switch_context(&old->context, &p->context);
             return;
         }

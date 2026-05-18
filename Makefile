@@ -31,6 +31,7 @@ C_SRCS = kernel/main.c \
 		  kernel/initrd.c \
 		  kernel/elf_loader.c \
 		  kernel/lib/mem.c \
+		  kernel/proc/user_trampoline.c \
           kernel/lib/serial.c \
           kernel/arch/x86_64/vga.c \
           kernel/arch/x86_64/gdt.c \
@@ -45,7 +46,8 @@ C_SRCS = kernel/main.c \
 ASM_SRCS = boot/boot.asm \
             kernel/arch/x86_64/isr_stub.asm \
             kernel/arch/x86_64/context.asm \
-            kernel/proc/proc_entry.asm
+            kernel/proc/proc_entry.asm \
+			kernel/proc/proc_entry_user.asm
 
 C_OBJS   = $(C_SRCS:.c=.o)
 ASM_OBJS = $(ASM_SRCS:.asm=.o)

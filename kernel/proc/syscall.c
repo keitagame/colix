@@ -22,6 +22,7 @@ uint64_t syscall_handler(uint64_t num, uint64_t a1, uint64_t a2,
         // a1=fd, a2=buf, a3=len
         // fd=1(stdout),fd=2(stderr) → シリアル/VGAに出力
         int fd = (int)a1;
+        kprintf("[SYSCALL] SYS_WRITE\n");
         const char *buf = (const char*)a2;
         uint64_t len = a3;
         if (fd == 1 || fd == 2) {

@@ -99,6 +99,27 @@ static void parse_mmap(mb2_info_t *info, uint64_t *best_base, uint64_t *best_siz
         p += ALIGN_UP(tag->size, 8);
     }
 }
+void enter_user_mode(uint64_t rip, uint64_t rsp, uint64_t cr3) {
+    
+
+    asm volatile(
+        "mov $0x23, %%ax\n"
+        "mov %%ax, %%ds\n"
+        "mov %%ax, %%es\n"
+        "mov %%ax, %%fs\n"
+        "mov %%ax, %%gs\n"
+
+        "pushq $0x23\n"          // SS
+        "pushq %0\n"             // RSP
+        "pushq $0x202\n"         // RFLAGS (IF=1)
+        "pushq $0x1B\n"          // CS
+        "pushq %1\n"             // RIP
+        "iretq\n"
+        :
+        : "r"(rsp), "r"(rip)
+        : "rax", "memory"
+    );
+}
 
 // カーネルメインエントリポイント
 // boot.asm から呼ばれる: rdi=mb_info_ptr, rsi=magic
@@ -122,6 +143,7 @@ void kernel_main(uint32_t magic, mb2_info_t *mb_info) {
     // ── アーキテクチャ初期化 ────────────────────────────
     gdt_init();
     idt_init();
+    
     pic_init();
     pit_init();
 
@@ -178,10 +200,10 @@ initrd_init(mod_start, mod_end);
     initrd_list();
    // kprintf("user_sp offset = %zu\n", offsetof(process_t, user_sp));
     // アイドルプロセス (PID=1)
-    /*
+    
     process_t *idle = proc_create("idle", proc_idle, false);
     if (!idle) panic("failed to create idle process");
-
+/*
     // テストプロセス
     process_t *hello = proc_create("hello", proc_hello, false);
     if (!hello) panic("failed to create hello process");
@@ -189,21 +211,37 @@ initrd_init(mod_start, mod_end);
     process_t *sender = proc_create("sender", proc_sender, false);
     if (!sender) panic("failed to create sender process");
 */
+
 elf_load_result_t elf;
 if (elf_load_from_initrd("bin/sh", &elf)) {
+    kprintf("[ELF] loaded bin/sh entry=%p\n", (void*)elf.entry);
+
     process_t *shell = proc_create_elf("sh", elf.entry);
-    
+    kprintf("[ELF] created shell proc=%p pid=%d\n",
+            shell, shell ? shell->pid : -1);
+
+
     if (!shell) panic("failed to create shell process");
 } else {
     kprintf("[KERN] failed to load shell\n");
 }
+/*
+elf_load_result_t elf;
+if (elf_load_from_initrd("bin/sh", &elf)) {
+    process_t *shell = proc_create_elf("sh", elf.entry);
+    current_proc = shell;
+    shell->state  = PROC_RUNNING;
+    if (!shell) panic("failed to create shell process");
+} else {
+    kprintf("[KERN] failed to load shell\n");
+}*/
 
     // ── スケジューラ起動 ────────────────────────────────
     kprintf("[KERN] starting scheduler...\n");
 
     // 割り込み有効化 (ここからタイマー割り込みが来る)
-    //current_proc = idle;
-    //idle->state  = PROC_RUNNING;
+    current_proc = idle;
+idle->state = PROC_RUNNING;
     sti();
 
     // アイドルループ: スケジューラが他のプロセスを動かす

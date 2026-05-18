@@ -181,7 +181,7 @@ typedef struct process {
 
     cpu_context_t  context;          // カーネルスケジューラコンテキスト
     uint64_t       kernel_rsp;       // カーネルスタックトップ (TSS/SYSCALL 用)
-    uint64_t       user_rsp;         // ユーザースタック初期値
+    //uint64_t       user_rsp;         // ユーザースタック初期値
 
     uint64_t       sleep_ticks;
     pid_t          wait_pid;         // waitpid 待機中の子 PID
@@ -198,6 +198,13 @@ typedef struct process {
     uint64_t       brk;
 struct trapframe64 *tf;
     char name[16];
+    uint64_t cr3;
+    bool          is_user;
+    bool          started;      // まだ一度もユーザモードで動いてないか
+
+    // ユーザモードでの開始位置
+    uint64_t      user_rip;
+    uint64_t      user_rsp;
     uint64_t user_sp;
 } process_t;
 

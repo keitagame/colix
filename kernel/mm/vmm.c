@@ -43,6 +43,19 @@ static uint64_t *alloc_table(void) {
     if (!t) panic("vmm: out of memory for page table");
     return t;
 }
+void vmm_map_user_stack(process_t *p, uint64_t base, uint64_t size) {
+    for (uint64_t off = 0; off < size; off += 0x1000) {
+        uint64_t phys = pmm_alloc_page();
+        if (!phys) panic("no memory for user stack");
+
+        vmm_map_page(
+            p->cr3,                 // プロセスのページテーブル
+            base + off,             // 仮想アドレス
+            phys,                   // 物理アドレス
+            PAGE_WRITE  // ★ユーザ権限
+        );
+    }
+}
 
 // 指定PML4にマッピングを追加
 int vmm_map(page_table_t pml4, uintptr_t virt, uintptr_t phys, uint64_t flags) {
