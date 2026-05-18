@@ -11,8 +11,8 @@ int alloc_pid(void);
 uint64_t alloc_kernel_stack_for_proc(process_t *p);
 //void vmm_map_user_stack(process_t *p, uint64_t base, uint64_t size);
 void enter_user_mode(uint64_t rip, uint64_t rsp, uint64_t cr3);
-extern uint64_t kernel_pml4;  // もしくは current_cr3()
-
+//extern uint64_t kernel_pml4;  // もしくは current_cr3()
+/*
 void vmm_map_user_stack(process_t *p, uint64_t base, uint64_t size) {
     for (uint64_t off = 0; off < size; off += 0x1000) {
         uint64_t phys = pmm_alloc_page();
@@ -20,7 +20,7 @@ void vmm_map_user_stack(process_t *p, uint64_t base, uint64_t size) {
                      PAGE_WRITE);
     }
 }
-
+*/
 // 次のPIDカウンタ
 static pid_t next_pid = 1;
 /*
