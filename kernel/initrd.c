@@ -75,12 +75,19 @@ static uint32_t hex8_to_u32(const char *s) {
 static uint32_t align4(uint32_t x) {
     return (x + 3) & ~3u;
 }
-
+static uintptr_t align4_ptr(uintptr_t x) {
+    return (x + 3) & ~((uintptr_t)3);
+}
 // ─────────────────────────────────────────────
 // initrd 初期化：cpio newc を走査してテーブル構築
 // ─────────────────────────────────────────────
 void initrd_init(uint8_t *start, uint8_t *end) {
     initrd_file_count = 0;
+kprintf("[INITRD] dump @%p (first 32 bytes):\n", start);
+    for (int i = 0; i < 32; i++) {
+        kprintf("%02x ", start[i]);
+    }
+    kprintf("\n");
 
     uint8_t *p = start;
     while (p + sizeof(cpio_newc_header_t) <= end) {
@@ -107,15 +114,17 @@ void initrd_init(uint8_t *start, uint8_t *end) {
         }
 
         // 名前部分を4バイト境界に揃える
-        uint32_t name_pad = align4(namesize);
-        p += name_pad;
-
+        //uint32_t name_pad = align4(namesize);
+        //p += name_pad;
+        p += namesize;
+        p = (uint8_t*)align4_ptr((uintptr_t)p);
         uint8_t *file_data = p;
 
         // ファイル本体を4バイト境界に揃える
-        uint32_t file_pad = align4(filesize);
-        p += file_pad;
-
+        //uint32_t file_pad = align4(filesize);
+        //p += file_pad;
+        p += filesize;
+        p = (uint8_t*)align4_ptr((uintptr_t)p);
         if (p > end) break;
 
         if (initrd_file_count < INITRD_MAX_FILES) {

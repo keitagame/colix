@@ -142,8 +142,8 @@ void kernel_main(uint32_t magic, mb2_info_t *mb_info) {
 kprintf("[INITRD] start=%p end=%p size=%u\n",
             initrd_start, initrd_end,
             (unsigned)(initrd_end - initrd_start));
-uint8_t *initrd_start = NULL;
-    uint8_t *initrd_end   = NULL;
+uint8_t *mod_start = NULL;
+    uint8_t *mod_end   = NULL;
 
     struct multiboot_tag *tag;
 
@@ -156,21 +156,21 @@ uint8_t *initrd_start = NULL;
         if (tag->type == MULTIBOOT2_TAG_TYPE_MODULE) {
             struct multiboot_tag_module *m = (struct multiboot_tag_module *)tag;
 
-            initrd_start = (uint8_t *)(uintptr_t)m->mod_start;
-            initrd_end   = (uint8_t *)(uintptr_t)m->mod_end;
+            mod_start = (uint8_t *)(uintptr_t)m->mod_start;
+            mod_end   = (uint8_t *)(uintptr_t)m->mod_end;
 
             kprintf("[INITRD] module start=%p end=%p size=%u\n",
-                    initrd_start, initrd_end,
-                    (unsigned)(initrd_end - initrd_start));
+                    mod_start, mod_end,
+                    (unsigned)(mod_end - mod_start));
             break; // 最初の module を initrd とみなす
         }
     }
 
-    if (!initrd_start) {
+    if (!mod_start) {
         kprintf("[INITRD] no module found\n");
         
     }
-initrd_init(initrd_start, initrd_end);
+initrd_init(mod_start, mod_end);
     initrd_list();
     // アイドルプロセス (PID=1)
     process_t *idle = proc_create("idle", proc_idle, false);

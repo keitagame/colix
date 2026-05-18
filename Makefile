@@ -92,9 +92,8 @@ run: $(TARGET)
 run-iso: $(ISO)
 	qemu-system-x86_64 \
 		-cdrom $(ISO) \
-		-serial stdio \
 		-m 128M \
-		-no-reboot
+		-no-reboot -nographic
 
 # デバッグ (GDB接続待ち)
 debug: $(TARGET)
