@@ -139,7 +139,9 @@ typedef struct {
     uint32_t                offset;
     const struct initrd_file *file;   // NULL = stdin/stdout/stderr
 } fd_entry_t;
-
+#define USER_STACK_TOP  0x0000000000800000ULL  // 好きな高位アドレス
+#define USER_STACK_SIZE 0x0000000000001000ULL  // とりあえず 1 ページ(4KB)
+#define PROC_USER_SP_OFFSET  offsetof(process_t, user_sp)
 // ── プロセス管理 ────────────────────────────────────────
 #define PROC_MAX      64
 #define STACK_SIZE    (PAGE_SIZE * 8)
@@ -183,7 +185,7 @@ typedef struct process {
 
     uint64_t       sleep_ticks;
     pid_t          wait_pid;         // waitpid 待機中の子 PID
-
+uint64_t user_sp;
     // IPC
     struct ipc_message *msg_queue;
     struct ipc_message *msg_tail;

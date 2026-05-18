@@ -1,5 +1,7 @@
 #include "kernel.h"
-
+#include "vmm.h"
+#include "pmm.h"
+#include "elf.h"
 process_t  proc_table[PROC_MAX];
 process_t *current_proc = NULL;
 uint64_t   ticks = 0;
@@ -35,9 +37,21 @@ process_t *proc_create_elf(const char *name, uint64_t entry) {
     p->tf = (struct trapframe64 *)(stack_top - sizeof(struct trapframe64));
 
     memset(p->tf, 0, sizeof(struct trapframe64));
-
+uint64_t user_stack_bottom = USER_STACK_TOP - USER_STACK_SIZE;
+    for (uint64_t va = user_stack_bottom; va < USER_STACK_TOP; va += 0x1000) {
+        uint64_t pa = pmm_alloc_page();
+        if (!pa) {
+            // TODO: エラー処理（今は雑に panic でもいい）
+            // panic("no memory for user stack");
+        }
+vmm_map(kernel_pml4, va, pa, 0x3); 
+        //vmm_map(va, pa, 0x3);  // present | writable（カーネルと同じ PML4 前提）
+    }
     p->tf->rip = entry;
-    p->tf->rsp = stack_top - 0x20; // 少し余裕
+    p->tf->rsp    = USER_STACK_TOP - 0x10;
+    p->user_sp = USER_STACK_TOP - 0x10;
+
+    //p->tf->rsp = stack_top - 0x20; // 少し余裕
     p->tf->cs  = 0x08;             // カーネルコード
     p->tf->ss  = 0x10;             // カーネルデータ
     p->tf->rflags = 0x202;         // IF=1

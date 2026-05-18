@@ -188,8 +188,9 @@ initrd_init(mod_start, mod_end);
     if (!sender) panic("failed to create sender process");
 
 elf_load_result_t elf;
-if (elf_load_from_initrd("bin/shell", &elf)) {
-    process_t *shell = proc_create_elf("shell", elf.entry);
+if (elf_load_from_initrd("bin/sh", &elf)) {
+    process_t *shell = proc_create_elf("sh", elf.entry);
+    
     if (!shell) panic("failed to create shell process");
 } else {
     kprintf("[KERN] failed to load shell\n");
