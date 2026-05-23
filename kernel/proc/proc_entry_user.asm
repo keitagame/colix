@@ -1,27 +1,22 @@
-; proc_entry_user.asm
 BITS 64
 global proc_entry_user
 extern current_proc
 extern enter_user_mode
-%define USER_RIP_OFFSET  0x58
-%define USER_SP_OFFSET   0x50
-%define CR3_OFFSET       0x60
+
+%define USER_RIP_OFFSET  0x1c8
+%define USER_SP_OFFSET   0x1d8
+%define CR3_OFFSET       0x1b8   ; さっき出した値
 
 proc_entry_user:
-    ; current_proc を読む
-    mov rax, [rel current_proc]
+    mov rbx, [rel current_proc]
 
-    ; rdi = user_rip
-    mov rdi, [rax + USER_RIP_OFFSET]
+    ; 引数セット
+    mov rdi, [rbx + USER_RIP_OFFSET]  ; RIP
+    mov rsi, [rbx + USER_SP_OFFSET]   ; RSP
+    mov rdx, [rbx + CR3_OFFSET]       ; CR3
 
-    ; rsi = user_rsp
-    mov rsi, [rax + USER_SP_OFFSET]
-
-    ; rdx = cr3
-    mov rdx, [rax + CR3_OFFSET]
-
-    ; ユーザモードへ遷移
-    call enter_user_mode
+    ; 直接ジャンプ（call禁止）
+    jmp enter_user_mode
 
 .hang:
     hlt

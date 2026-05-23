@@ -1,27 +1,22 @@
-; user_enter.asm
 BITS 64
-global user_enter
+global enter_user_mode
 
-; void user_enter(uint64_t rip, uint64_t rsp);
-; rdi = rip, rsi = rsp
-user_enter:
-    mov rcx, rdi        ; rcx = rip
-    mov rdx, rsi        ; rdx = rsp
+enter_user_mode:
+    ; rdi = rip
+    ; rsi = rsp
+    ; rdx = cr3
 
-    mov ax, 0x23        ; user data (RPL=3)
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
+    ; ページテーブル切替
+    mov cr3, rdx
 
-    ; ユーザスタックに「戻りフレーム」を積む
-    pushq 0x23          ; SS
-    pushq rdx           ; RSP
-    pushfq
-    pop rax
-    or rax, (1 << 9)    ; IF=1
-    push rax
-    pushq 0x2B          ; CS (user code 64)
-    pushq rcx           ; RIP
+    ; ユーザスタック設定
+    mov rsp, rsi
+
+    ; iretqフレーム構築
+    push 0x23        ; SS (user data)
+    push rsi         ; RSP
+    push 0x202       ; RFLAGS (IF=1)
+    push 0x1B        ; CS (user code)
+    push rdi         ; RIP
 
     iretq

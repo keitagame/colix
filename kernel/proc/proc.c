@@ -2,6 +2,8 @@
 #include "vmm.h"
 #include "pmm.h"
 #include "elf.h"
+#include <stddef.h>
+#define offsetof(type, member) ((size_t)&(((type *)0)->member))
 process_t  proc_table[PROC_MAX];
 process_t *current_proc = NULL;
 uint64_t   ticks = 0;
@@ -76,6 +78,9 @@ vmm_map(kernel_pml4, va, pa, 0x3);
 }
 */
 process_t *proc_create_elf(const char *name, elf_load_result_t *elf) {
+    
+kprintf("RIP_OFFSET   = 0x%x\n", (uint32_t)offsetof(process_t, user_rip));
+kprintf("SP_OFFSET  = 0x%x\n", (uint32_t)offsetof(process_t, user_sp));
     process_t *p = alloc_proc_slot();   // proc_table から空きを取る前提
 
     p->pid     = alloc_pid();
@@ -88,6 +93,7 @@ process_t *proc_create_elf(const char *name, elf_load_result_t *elf) {
     vmm_map_user_stack(p, user_stack_top - 0x1000, 0x1000);
 
     p->user_rip = elf->entry;
+    kprintf("elf->entry = %p\n", elf->entry);
     p->user_rsp = user_stack_top;
 
     // ページテーブル（必要なら）
