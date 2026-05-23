@@ -13,70 +13,11 @@ int alloc_pid(void);
 uint64_t alloc_kernel_stack_for_proc(process_t *p);
 //void vmm_map_user_stack(process_t *p, uint64_t base, uint64_t size);
 void enter_user_mode(uint64_t rip, uint64_t rsp, uint64_t cr3);
-//extern uint64_t kernel_pml4;  // もしくは current_cr3()
-/*
-void vmm_map_user_stack(process_t *p, uint64_t base, uint64_t size) {
-    for (uint64_t off = 0; off < size; off += 0x1000) {
-        uint64_t phys = pmm_alloc_page();
-        vmm_map_page(kernel_pml4, base + off, phys,
-                     PAGE_WRITE);
-    }
-}
-*/
+
 // 次のPIDカウンタ
 static pid_t next_pid = 1;
-/*
-process_t *proc_create_elf(const char *name, uint64_t entry) {
-    process_t *p = proc_create(name, NULL, false); // ベースだけ作る
-    if (!p) return NULL;
 
-    // スタック確保（1ページ）
-    uint64_t stack = pmm_alloc_page();
-    if (!stack) return NULL;
 
-    p->rsp = stack + 0x1000; // 上端
-    p->rip = entry;
-    p->rbp = 0;
-
-    p->state = PROC_READY;
-    return p;
-}
-
-process_t *proc_create_elf(const char *name, uint64_t entry) {
-    process_t *p = proc_create(name, NULL, false);
-    if (!p) return NULL;
-
-    // カーネルスタック確保
-    p->kstack = pmm_alloc_page();
-    uint64_t stack_top = (uint64_t)p->kstack + 0x1000;
-
-    // trapframe をスタック上に作る
-    p->tf = (struct trapframe64 *)(stack_top - sizeof(struct trapframe64));
-
-    memset(p->tf, 0, sizeof(struct trapframe64));
-uint64_t user_stack_bottom = USER_STACK_TOP - USER_STACK_SIZE;
-    for (uint64_t va = user_stack_bottom; va < USER_STACK_TOP; va += 0x1000) {
-        uint64_t pa = pmm_alloc_page();
-        if (!pa) {
-            // TODO: エラー処理（今は雑に panic でもいい）
-            // panic("no memory for user stack");
-        }
-vmm_map(kernel_pml4, va, pa, 0x3); 
-        //vmm_map(va, pa, 0x3);  // present | writable（カーネルと同じ PML4 前提）
-    }
-    p->tf->rip = entry;
-    p->tf->rsp    = USER_STACK_TOP - 0x10;
-    p->user_sp = USER_STACK_TOP - 0x10;
-
-    //p->tf->rsp = stack_top - 0x20; // 少し余裕
-    p->tf->cs  = 0x08;             // カーネルコード
-    p->tf->ss  = 0x10;             // カーネルデータ
-    p->tf->rflags = 0x202;         // IF=1
-
-    p->state = PROC_READY;
-    return p;
-}
-*/
 process_t *proc_create_elf(const char *name, elf_load_result_t *elf) {
     
 kprintf("RIP_OFFSET   = 0x%x\n", (uint32_t)offsetof(process_t, user_rip));
@@ -98,7 +39,9 @@ kprintf("SP_OFFSET  = 0x%x\n", (uint32_t)offsetof(process_t, user_sp));
 
     // ページテーブル（必要なら）
     //p->cr3 = elf->cr3;  // or vmm_clone_kernel_space()
+extern page_table_t kernel_pml4;
 
+p->cr3 = kernel_pml4;
     // カーネルスタックも確保（syscall/IRQ 用）
     p->kernel_rsp = alloc_kernel_stack_for_proc(p);
 extern void proc_entry_user(void);
@@ -210,7 +153,7 @@ process_t *proc_create(const char *name, void (*entry)(void), bool user) {
 
     // TSSのRSP0 (カーネルスタックトップ = 割り込み時に使用)
     p->kernel_rsp = kstack_top;
-memset(&p->context, 0, sizeof(p->context));
+//memset(&p->context, 0, sizeof(p->context));
     p->pid   = next_pid++;
     p->ppid  = current_proc ? current_proc->pid : 0;
     p->state = PROC_READY;
@@ -298,7 +241,7 @@ void schedule(void) {
             gdt_set_tss_rsp0(p->kernel_rsp);
             if (p->is_user && !p->started) {
                 p->started = true;
-                enter_user_mode(p->user_rip, p->user_rsp, p->cr3);
+                //enter_user_mode(p->user_rip, p->user_rsp, p->cr3);
                 // ここには戻ってこない（iretq でユーザに飛ぶ）
             }
             switch_context(&old->context, &p->context);

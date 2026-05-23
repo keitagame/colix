@@ -17,10 +17,19 @@ bool elf_load_from_initrd(const char *path, elf_load_result_t *out) {
         kprintf("[ELF] too small: %s\n", path);
         return false;
     }
-
+/*
     const uint8_t *base = f->data;
     const elf64_ehdr_t *eh = (const elf64_ehdr_t *)base;
+*/
+const uint8_t *base = f->data;
 
+kprintf("base = %p\n", base);
+kprintf("magic = %x\n", *(uint32_t*)base);
+
+const elf64_ehdr_t *eh = (const elf64_ehdr_t *)base;
+
+kprintf("e_entry = %p\n", eh->e_entry);
+kprintf("e_phoff = %lx\n", eh->e_phoff);
     uint32_t magic = *(const uint32_t *)eh->e_ident;
     if (magic != ELF_MAGIC) {
         kprintf("[ELF] bad magic: %x\n", magic);
