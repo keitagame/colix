@@ -3,6 +3,8 @@
 #include "pmm.h"
 #include "elf.h"
 #include <stddef.h>
+#define KERNEL_BASE 0xFFFFFFFF80000000
+
 #define offsetof(type, member) ((size_t)&(((type *)0)->member))
 process_t  proc_table[PROC_MAX];
 process_t *current_proc = NULL;
@@ -17,40 +19,6 @@ void enter_user_mode(uint64_t rip, uint64_t rsp, uint64_t cr3);
 // 次のPIDカウンタ
 static pid_t next_pid = 1;
 
-
-process_t *proc_create_elf(const char *name, elf_load_result_t *elf) {
-    
-kprintf("RIP_OFFSET   = 0x%x\n", (uint32_t)offsetof(process_t, user_rip));
-kprintf("SP_OFFSET  = 0x%x\n", (uint32_t)offsetof(process_t, user_sp));
-    process_t *p = alloc_proc_slot();   // proc_table から空きを取る前提
-
-    p->pid     = alloc_pid();
-    p->state   = PROC_READY;
-    p->is_user = true;
-    p->started = false;
-
-    // ユーザスタック確保（例: 上位アドレスに 1 ページ）
-    uint64_t user_stack_top = 0x00007fffffffe000ULL;
-    vmm_map_user_stack(p, user_stack_top - 0x1000, 0x1000);
-
-    p->user_rip = elf->entry;
-    kprintf("elf->entry = %p\n", elf->entry);
-    p->user_rsp = user_stack_top;
-
-    // ページテーブル（必要なら）
-    //p->cr3 = elf->cr3;  // or vmm_clone_kernel_space()
-extern page_table_t kernel_pml4;
-
-p->cr3 = kernel_pml4;
-    // カーネルスタックも確保（syscall/IRQ 用）
-    p->kernel_rsp = alloc_kernel_stack_for_proc(p);
-extern void proc_entry_user(void);
-
-p->context.rsp = p->kernel_rsp;
-p->context.rip = (uint64_t)proc_entry_user;
-
-    return p;
-}
 process_t *alloc_proc_slot(void) {
     for (int i = 0; i < PROC_MAX; i++) {
         if (proc_table[i].state == PROC_UNUSED) {
@@ -90,9 +58,75 @@ static process_t *alloc_proc(void) {
     }
     return NULL;
 }
+void *memcpy(void *dest, const void *src, size_t n) {
+    char *d = dest;
+    const char *s = src;
+    while (n--) {
+        *d++ = *s++;
+    }
+    return dest;
+}
+process_t *proc_create_elf(const char *name, elf_load_result_t *elf) {
+    process_t *p = alloc_proc_slot();
+    if (!p) return NULL;
 
-// カーネルプロセス/スレッドの生成
-// user=false: カーネルスタックのみ使用
+    p->pid     = alloc_pid();
+    p->state   = PROC_READY;
+    p->is_user = true;
+    p->started = false;
+
+    // =========================================================
+    // ⭕ 修正: プロセス固有の PML4 を作成し、カーネル空間をコピーする
+    // =========================================================
+    uint64_t new_pml4_pa = (uint64_t)pmm_alloc_page(); // 物理ページを1枚確保
+    if (!new_pml4_pa) panic("no memory for process PML4");
+    
+    // page_table_t 自体がポインタ(uint64_t*)なので、* を付けずに宣言します
+    page_table_t v_new_pml4 = (page_table_t)(new_pml4_pa + KERNEL_BASE);
+    
+    // 新しいページテーブルをゼロクリア
+    memset(v_new_pml4, 0, 4096);
+
+    // カーネルのPML4テーブルから、中身を丸ごと4KBコピーして共有する
+    extern page_table_t kernel_pml4;
+    // kernel_pml4の指すアドレスから4KB分を確実にコピーするため、void*にキャスト
+    memcpy(v_new_pml4, (void*)((uint64_t)kernel_pml4), 4096); 
+
+    // p->cr3 は uint64_t 型（実体は物理アドレス）なので、キャストして代入
+    p->cr3 = (uint64_t)new_pml4_pa; 
+    p->pml4 = v_new_pml4;              
+
+    // =========================================================
+    // ユーザスタック (p->pml4を使用)
+    // =========================================================
+    uint64_t user_stack_top = 0x00007fffffffe000ULL;
+    for (uint64_t addr = user_stack_top - 0x1000; addr < user_stack_top; addr += 0x1000) {
+        uint64_t pa = (uint64_t)pmm_alloc_page();
+        // 必ず新しく作ったプロセスのpml4に対してマップする
+        vmm_map(p->pml4, addr, pa, 0x7);  
+    }
+    
+    // =========================
+    // entry設定
+    // =========================
+    p->user_rip = elf->entry; 
+    p->user_rsp = user_stack_top;
+
+    kprintf("elf_entry = %p\n", (void*)elf->entry);
+    kprintf("user_rip = %p\n", (void*)p->user_rip);
+    kprintf("user_rsp = %p\n", (void*)p->user_rsp);
+
+    // =========================
+    // カーネルスタック
+    // =========================
+    p->kernel_rsp = alloc_kernel_stack_for_proc(p);
+
+    extern void proc_entry_user(void);
+    p->context.rsp = p->kernel_rsp;
+    p->context.rip = (uint64_t)proc_entry_user;
+
+    return p;
+}
 process_t *proc_create(const char *name, void (*entry)(void), bool user) {
     (void)user; // 現在はカーネルモードのみ
 
@@ -171,7 +205,6 @@ process_t *proc_create(const char *name, void (*entry)(void), bool user) {
     kprintf("[PROC] created '%s' pid=%d\n", p->name, p->pid);
     return p;
 }
-
 process_t *proc_find(pid_t pid) {
     for (int i = 0; i < PROC_MAX; i++)
         if (proc_table[i].state != PROC_UNUSED && proc_table[i].pid == pid)

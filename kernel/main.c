@@ -216,7 +216,7 @@ elf_load_result_t elf;
 if (elf_load_from_initrd("bin/sh", &elf)) {
     kprintf("[ELF] loaded bin/sh entry=%p\n", (void*)elf.entry);
 
-    process_t *shell = proc_create_elf("sh", elf.entry);
+    process_t *shell = proc_create_elf("sh", elf);
     kprintf("[ELF] created shell proc=%p pid=%d\n",
             shell, shell ? shell->pid : -1);
 
